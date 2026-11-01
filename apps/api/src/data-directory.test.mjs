@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { validateDataDirectory } from './data-directory.ts';
 
 test('private storage rejects source root, descendants, ancestors and relative paths', () => {
-  const temp = mkdtempSync(path.join(os.tmpdir(), 'sovrad-path-'));
+  // Hosted Windows temp paths may use 8.3 aliases; the validator returns canonical paths.
+  const temp = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'sovrad-path-')));
   try {
     const source = path.join(temp, 'source');
     mkdirSync(source);
@@ -22,7 +23,7 @@ test('private storage rejects source root, descendants, ancestors and relative p
 });
 
 test('a junction into source cannot bypass storage validation', () => {
-  const temp = mkdtempSync(path.join(os.tmpdir(), 'sovrad-junction-'));
+  const temp = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'sovrad-junction-')));
   try {
     const source = path.join(temp, 'source');
     const alias = path.join(temp, 'alias');
