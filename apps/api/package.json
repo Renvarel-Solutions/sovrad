@@ -1,0 +1,25 @@
+{
+  "name": "@renvarel/architect-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test src/*.test.mjs"
+  },
+  "dependencies": {
+    "@renvarel/architect-core": "0.1.0",
+    "better-sqlite3": "^12.2.0",
+    "fastify": "^5.4.0",
+    "openai": "^6.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3"
+  }
+}
