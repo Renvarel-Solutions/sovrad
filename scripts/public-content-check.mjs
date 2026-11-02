@@ -1,4 +1,4 @@
-import {readdirSync, readFileSync, lstatSync} from 'node:fs';
+import {readdirSync, readFileSync, lstatSync, realpathSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -11,6 +11,7 @@ const privateName = /^(?:\.env(?:\..*)?|\.dev\.vars(?:\..*)?|local\.properties|i
 const secret = /-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|\d{6,}:[A-Za-z0-9_-]{25,})\b/;
 
 export function checkPublicFiles(root) {
+  root = realpathSync.native(root);
   const violations = [];
   let candidates;
   let git = false;
