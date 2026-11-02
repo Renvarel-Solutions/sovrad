@@ -6,7 +6,8 @@ credentials, databases, private repository code or agent transcripts.
 
 Use Node 24. Run npm ci, npm test, npm run check, npm run public-check and
 npm run test:e2e before proposing a change. On Windows browser tests use Chrome;
-on CI install Chromium with Playwright. Stop the running demo before E2E tests.
+on CI install Chromium with Playwright. E2E uses scratch ports 5175 (web) and
+4319 (API), refuses occupied ports and does not stop an existing application.
 
 Keep changes focused and include regression tests for approval, revision,
 storage and authorization behavior. Explain the actual checks run and any

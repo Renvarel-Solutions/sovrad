@@ -2,7 +2,10 @@ import Fastify, {type FastifyInstance, type FastifyReply} from 'fastify';
 import { z } from 'zod';
 import { pathToFileURL } from 'node:url';
 import { Storage } from './storage.js';
-import { registerAI, type AIConfig } from './ai.js';
+import { registerAI, aiConfigured, type AIConfig } from './ai.js';
+import {registerImplementation} from './implementation-routes.js';
+import {registerImports} from './import-routes.js';
+import {containsPrivateContent} from './privacy.js';
 
 const manualSchema = z.object({
   workflowId: z.string().min(1).max(100), stepId: z.string().min(1).max(100),
@@ -19,12 +22,12 @@ function handleError(reply: FastifyReply, error: unknown): FastifyReply {
   return reply.code(500).send({error: 'Unable to complete this request. No change was applied.'});
 }
 
-function localBoundary(app: FastifyInstance, port: number): void {
+function localBoundary(app: FastifyInstance, port: number, webPort: number, privateKey?: string): void {
   app.addHook('onRequest', async (req, reply) => {
     if (!['127.0.0.1:' + port, 'localhost:' + port].includes(req.headers.host || '')) {
       return reply.code(403).send({error: 'Unapproved host'});
     }
-    if (req.headers.origin && !['http://127.0.0.1:5173', 'http://localhost:5173'].includes(req.headers.origin)) {
+    if (req.headers.origin && !['http://127.0.0.1:'+webPort, 'http://localhost:'+webPort].includes(req.headers.origin)) {
       return reply.code(403).send({error: 'Unapproved origin'});
     }
     if (req.headers['sec-fetch-site'] === 'cross-site') return reply.code(403).send({error: 'Cross-site request refused'});
@@ -32,25 +35,45 @@ function localBoundary(app: FastifyInstance, port: number): void {
       return reply.code(403).send({error: 'Missing local action header'});
     }
   });
-  app.addHook('onSend', async (_req, reply) => {
+  app.addHook('onSend', async (_req, reply, payload) => {
     reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');
+    if (privateKey && typeof payload==='string' && payload.includes(privateKey)) {
+      reply.code(500);
+      return JSON.stringify({error:'Private response refused'});
+    }
+    return payload;
   });
 }
 
-export function buildApp(storage: Storage, options: {port?: number; ai?: AIConfig} = {}): FastifyInstance {
+export function buildApp(storage: Storage, options: {port?: number; webPort?: number; ai?: AIConfig} = {}): FastifyInstance {
   const port = options.port ?? 4317;
+  const webPort = options.webPort ?? 5173;
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid API_PORT');
+  if (!Number.isInteger(webPort) || webPort < 1024 || webPort > 65535) throw new Error('Invalid WEB_PORT');
   const ai = options.ai ?? {
     enabled: process.env.SOVRAD_AI_ENABLED === 'true',
     apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL,
+    hardLimitConfirmed: process.env.SOVRAD_AI_HARD_LIMIT_CONFIRMED === 'true',
   };
+  storage.imports.protectSecret(ai.apiKey);
   const app = Fastify({logger: false, bodyLimit: 16384});
-  localBoundary(app, port);
+  const routeInventory: {method:string;url:string}[]=[];
+  app.decorate('routeInventory',routeInventory);
+  app.addHook('onRoute',route=>{
+    for (const method of Array.isArray(route.method)?route.method:[route.method]) routeInventory.push({method,url:route.url});
+  });
+  app.setNotFoundHandler((_req,reply)=>reply.code(404).send({error:'Route not found'}));
+  app.setErrorHandler((error,_req,reply)=>{
+    const code=typeof error==='object' && error!==null && 'statusCode' in error?error.statusCode:500;
+    const status=code===413?413:code===400 || error instanceof z.ZodError?400:500;
+    return reply.code(status).send({error:status===413?'Request too large':status===400?'Invalid request':'Unable to complete this request'});
+  });
+  localBoundary(app, port, webPort, ai.apiKey);
   app.addHook('onClose', () => storage.close());
   app.get('/api/health', async () => ({
     ok: true, service: 'sovrad-api', mode: 'local-only',
-    aiConfigured: ai.enabled && Boolean(ai.apiKey && ai.model), runnerEnabled: false,
+    aiConfigured: aiConfigured(ai), runnerEnabled: false,
   }));
   app.get('/api/projects', async () => ({projects: storage.projects()}));
   app.get('/api/projects/:id/workflows', async (req, reply) => {
@@ -64,15 +87,18 @@ export function buildApp(storage: Storage, options: {port?: number; ai?: AIConfi
     if (!workflow) return reply.code(404).send({error: 'Workflow not found'});
     return {workflow, proposals: storage.proposals(id), history: storage.history(id)};
   });
-  registerProposals(app, storage);
+  registerProposals(app, storage, ai.apiKey);
   registerAI(app, storage, ai);
+  registerImplementation(app, storage);
+  registerImports(app, storage);
   return app;
 }
 
-function registerProposals(app: FastifyInstance, storage: Storage): void {
+function registerProposals(app: FastifyInstance, storage: Storage, privateKey?: string): void {
   app.post('/api/proposals', async (req, reply) => {
     try {
       const input = manualSchema.parse(req.body);
+      if (containsPrivateContent(input, privateKey)) return reply.code(400).send({error:'Credential-like content refused'});
       return reply.code(201).send({proposal: storage.propose({...input, provenance: 'manual'})});
     } catch (error) { return handleError(reply, error); }
   });
@@ -87,7 +113,7 @@ function registerProposals(app: FastifyInstance, storage: Storage): void {
 
 async function start(): Promise<void> {
   const port = Number(process.env.API_PORT || 4317);
-  const app = buildApp(new Storage(), {port});
+  const app = buildApp(new Storage(), {port,webPort:Number(process.env.WEB_PORT || 5173)});
   const close = (): void => { void app.close(); };
   process.once('SIGINT', close);
   process.once('SIGTERM', close);

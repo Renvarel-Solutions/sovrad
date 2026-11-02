@@ -3,6 +3,7 @@ import {ReactFlow,Background,Controls,MiniMap,Handle,Position,type NodeProps,typ
 import {Activity,ArrowRight,BrainCircuit,Check,ChevronDown,Clock3,Code2,FolderGit2,GitBranch,GitPullRequest,Info,LockKeyhole,MessageSquarePlus,PanelLeftClose,RotateCcw,ShieldCheck,X} from 'lucide-react';
 import type {Project,Proposal,Step,Workflow} from '@renvarel/architect-core';
 import {api} from './api';
+import {AIStatus} from './AIStatus';
 
 type FlowData=Record<string,unknown>&{title:string;purpose:string;kind:Step['kind'];selected:boolean};
 function WorkflowNode({data}:NodeProps<Node<FlowData>>) {
@@ -122,6 +123,7 @@ export default function App(){
             <label htmlFor="explanation">Reason (optional)</label><input id="explanation" placeholder="Why is this change needed?" value={explanation} onChange={e=>setExplanation(e.target.value)}/>
             <button className="primary-button" disabled={busy||!message.trim()} onClick={()=>void submit(false)}><GitPullRequest size={16}/> Save proposal for review</button>
             <div className="ai-panel"><div className="ai-panel-heading"><BrainCircuit size={17}/> Optional OpenAI proposal</div>
+              <AIStatus refreshToken={busy} onAvailable={setAiAvailable}/>
               <p>Send this step's title, purpose, current rules and your suggestion to the configured OpenAI API. No repository code is included.</p>
               <label className="consent-label"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/><span>I approve sending these selected details to OpenAI.</span></label>
               <button className="secondary-button" disabled={busy||!message.trim()||!consent||!aiAvailable} onClick={()=>void submit(true)}><BrainCircuit size={15}/> Ask AI to draft rules</button>

@@ -1,0 +1,1 @@
+{"name":"@renvarel/sovrad-runner","version":"0.1.0","private":true,"type":"module","scripts":{"test":"tsx --test src/*.test.mjs","typecheck":"tsc --noEmit -p tsconfig.json"},"devDependencies":{"@types/node":"^22.15.0","tsx":"^4.20.0","typescript":"^5.8.3"}}

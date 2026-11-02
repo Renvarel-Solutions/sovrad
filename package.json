@@ -14,8 +14,8 @@
     "dev": "concurrently -k -n api,web -c cyan,green \"npm run dev --workspace @renvarel/architect-api\" \"npm run dev --workspace @renvarel/architect-web\"",
     "dev:api": "npm run dev --workspace @renvarel/architect-api",
     "dev:web": "npm run dev --workspace @renvarel/architect-web",
-    "check": "npm run typecheck --workspace @renvarel/architect-api && npm run typecheck --workspace @renvarel/architect-web && npm run build --workspace @renvarel/architect-web",
-    "test": "npm run test:core && npm run test --workspace @renvarel/architect-api && node --test scripts/*.test.mjs",
+    "check": "npm run typecheck --workspace @renvarel/architect-api && npm run typecheck --workspace @renvarel/sovrad-runner && npm run typecheck --workspace @renvarel/architect-web && npm run build --workspace @renvarel/architect-web",
+    "test": "npm run test:core && npm run test --workspace @renvarel/architect-api && npm run test --workspace @renvarel/sovrad-runner && node --test scripts/*.test.mjs",
     "test:core": "node --experimental-strip-types --test packages/core/test/*.test.mjs",
     "test:e2e": "playwright test",
     "public-check": "node scripts/public-content-check.mjs"
