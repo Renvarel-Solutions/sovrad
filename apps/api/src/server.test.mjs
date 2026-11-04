@@ -14,13 +14,16 @@ const ask = {workflowId, stepId: 'number-a', baseRevision: 1, text: 'Accept whol
 async function fixture(t, ai = {enabled: false}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'sovrad-http-'));
   const storage = new Storage(directory);
-  const app = buildApp(storage, {ai});
+  const originalFetch = ai.fetch;
+  const app = buildApp(storage, {ai: {...ai, hardLimitConfirmed: true, model: 'gpt-5.6-terra',
+    fetch: originalFetch ? async (url, options) => String(url).endsWith('/input_tokens') ?
+      new Response(JSON.stringify({input_tokens: 100}), {headers: {'Content-Type': 'application/json'}}) : originalFetch(url, options) : undefined}});
   t.after(async () => { await app.close(); rmSync(directory, {recursive: true, force: true}); });
   return {app, storage, directory};
 }
 const post = (app, url, payload, overrides = {}) => app.inject({method: 'POST', url, payload, headers: {...headers, ...overrides}});
 const response = (result = {proposedRules: ['Accept only whole numbers.'], explanation: 'Synthetic suggestion'}) =>
-  new Response(JSON.stringify({id: 'resp_synthetic', object: 'response', status: 'completed',
+  new Response(JSON.stringify({id: 'resp_synthetic', object: 'response', status: 'completed', usage: {input_tokens: 100, output_tokens: 20},
     output: [{type: 'message', role: 'assistant', content: [{type: 'output_text', text: JSON.stringify(result)}]}]}),
   {status: 200, headers: {'Content-Type': 'application/json'}});
 
@@ -145,7 +148,11 @@ test('AI daily quota survives close and reopen, including failed attempts', asyn
   const directory = mkdtempSync(path.join(os.tmpdir(), 'sovrad-quota-'));
   t.after(() => rmSync(directory, {recursive: true, force: true}));
   let attempts = 0;
-  const ai = {enabled: true, apiKey: 'synthetic-test-key', model: 'test-model', fetch: async () => ++attempts === 1 ? new Response('failure', {status: 500}) : response()};
+  const ai = {enabled: true, apiKey: 'synthetic-test-key', hardLimitConfirmed: true, model: 'gpt-5.6-terra', fetch: async url => {
+    if (String(url).endsWith('/input_tokens')) return ++attempts === 1 ? new Response('failure', {status: 500}) :
+      new Response(JSON.stringify({input_tokens: 100}), {headers: {'Content-Type': 'application/json'}});
+    return response();
+  }};
   let app = buildApp(new Storage(directory), {ai});
   try {
     for (let i = 0; i < 10; i++) assert.equal((await post(app, '/api/ai/proposal', ask)).statusCode, i === 0 ? 502 : 201);

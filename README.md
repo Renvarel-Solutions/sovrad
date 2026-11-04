@@ -20,8 +20,8 @@ npm run dev
 Open http://127.0.0.1:5173. The API binds to 127.0.0.1:4317.
 Browser tests use installed Google Chrome on Windows; on Linux or CI first run
 `npx playwright install chromium --with-deps`.
-Stop the demo before browser tests; the suite refuses occupied ports and uses a
-temporary synthetic database outside the repository.
+Browser tests use separate scratch ports 5175 (web) and 4319 (API), refuse
+occupied scratch ports and use a temporary synthetic database outside source.
 
 ## Try the calculator workflow
 
@@ -52,28 +52,33 @@ It is a heuristic; manually review everything before publishing.
 
 ## Optional OpenAI drafting
 
-AI is off by default. Configure a dedicated restricted key and account budget
-controls outside source, then set process environment variables in PowerShell:
+AI is off by default. Before enabling it, configure a dedicated backend key and
+an enforced $5 hard limit for its provider project. In a fresh PowerShell window
+with no existing API key, run:
 
 ```powershell
-$env:SOVRAD_AI_ENABLED = 'true'
-$env:OPENAI_API_KEY = '<restricted-key>'
-$env:OPENAI_MODEL = '<model-available-to-your-account>'
-npm run dev
+./scripts/start-private-ai.ps1 -HardLimitConfirmed
 ```
 
-The example environment file documents settings; the app does not load it
-automatically. Never put keys in browser settings, VITE variables, source files
-or commits.
+The script reads the key through a hidden prompt, starts only the API and removes
+its process environment settings when it exits. Start the web separately with
+`npm run dev:web`. Do not put a key literal in a command, browser setting,
+environment file, VITE variable, source file or commit. `.env.example` documents
+settings; the app does not load it automatically. Backend configuration requires
+`SOVRAD_AI_ENABLED=true` and `SOVRAD_AI_HARD_LIMIT_CONFIRMED=true` with the key.
 
 Each request needs explicit UI consent. Only the selected step's title,
 purpose, current rules and requested correction are sent. Consent resets when
 the selected step or revision changes. Credential-like content is refused.
-The backend uses the Responses API with structured output, store:false,
-a 1,500 output-token cap, a 20-second timeout and no automatic retries.
+The backend pins `gpt-5.6-terra`, reasoning effort `none`, structured output and
+`store:false`. It caps input at 8,192 tokens and output at 1,500 tokens, with a
+20-second timeout and no automatic retries. It counts input tokens before drafting.
 A durable limit of ten attempts per UTC day includes failed provider requests.
-This is a request limit, not a monthly dollar limit. Configure billing controls
-in the provider account separately.
+The local lifetime budget is $5 per database, using conservative accounting of
+$2.50 per million input tokens and $12 per million output tokens. This is local
+accounting, not an exact provider invoice or a replacement for provider controls.
+Pending or unknown charges pause further drafting across restarts; do not clear
+the database to bypass this pause. The budget panel shows the local status.
 
 Validated AI output is saved only as a draft. It cannot approve a requirement
 or execute code. Automated tests use synthetic keys and a local fake transport;
@@ -81,19 +86,27 @@ a passing test does not establish live model access or billing configuration.
 
 ## Controlled implementation roadmap
 
-Codex execution is disabled and has no HTTP execution endpoint. A workflow
-approval grants no permission to modify code, commit, merge or deploy.
+Codex coding is disabled. Backend task creation, exact-manifest approval,
+cancellation and event routes exist; starting an approved task returns a blocked
+result without launching coding. Creating a task prepares a synthetic Git
+calculator fixture in private storage. A workflow approval grants no permission
+to modify code, commit, merge or deploy.
 The separately gated runner plan is in [docs/RUNNER-PLAN.md](docs/RUNNER-PLAN.md).
 Its future execution must use an isolated worktree, exact approved revision,
 approved repository commit and enforced sandbox/command approvals.
 
-External repository import is also disabled. Real pilots remain private and
-require a separately approved read-only import plan.
+External repository import is also disabled: its HTTP submission route refuses
+capture. Internal snapshot helpers are tested with synthetic repositories; this
+does not establish a private-project import. The shipped UI remains the calculator
+workflow and budget panel; multi-project dashboards, annotations and an owner
+decision center are not implemented.
 
 ## Structure and quality
 
 - apps/web: React, React Flow, inspector and proposal review.
 - apps/api: local Fastify API, SQLite history and opt-in AI drafting.
+- apps/runner: task manifests, synthetic repository checks and a diagnostic-only
+  protocol client; native coding remains blocked.
 - packages/core: workflow model and revision-safe approval logic.
 - tests/e2e: real-browser approval and API-process restart checks.
 - scripts: publication scanner and its regression tests.

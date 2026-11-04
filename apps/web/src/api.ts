@@ -11,6 +11,7 @@ async function request<T>(path:string, options?:RequestInit):Promise<T> {
 }
 const postOptions=(body:unknown):RequestInit=>({method:'POST',headers:{'Content-Type':'application/json','X-Sovrad-Action':'1'},body:JSON.stringify(body)});
 export const api={
+  aiStatus:()=>request<{configured:boolean;model:string;limitMicros:number;remainingMicros:number;reservedMicros:number;spentMicros:number;paused:boolean;dailyAttempts:number}>('/ai/status'),
   health:()=>request<{ok:boolean;mode:string;aiConfigured:boolean}>('/health'),
   projects:()=>request<{projects:Project[]}>('/projects'),
   workflows:(id:string)=>request<{workflows:Workflow[]}>(`/projects/${encodeURIComponent(id)}/workflows`),

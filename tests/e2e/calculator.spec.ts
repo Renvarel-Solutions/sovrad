@@ -4,10 +4,15 @@ import {once} from 'node:events';
 import {mkdtempSync, rmSync, mkdirSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createServer} from 'node:net';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const directory = mkdtempSync(path.join(os.tmpdir(), 'sovrad-browser-'));
-const env = {...process.env, SOVRAD_DATA_DIR: directory, SOVRAD_AI_ENABLED: 'false', OPENAI_API_KEY: '', API_PORT: '4317'};
+const inherited = ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'CI'];
+const env = {
+  ...Object.fromEntries(inherited.flatMap(key => process.env[key] ? [[key, process.env[key]]] : [])),
+  SOVRAD_DATA_DIR: directory, SOVRAD_AI_ENABLED: 'false', OPENAI_API_KEY: '', WEB_PORT: '5175', API_PORT: '4319',
+};
 let api: ChildProcess;
 let web: ChildProcess;
 let logs = '';
@@ -28,16 +33,19 @@ async function waitForURL(url: string): Promise<void> {
     try { return (await fetch(url)).ok; } catch { return false; }
   }, {timeout: 20000, message: 'Test server did not start: ' + logs}).toBe(true);
 }
+async function assertPortAvailable(port: number): Promise<void> {
+  const probe = createServer();
+  await new Promise<void>((resolve, reject) => {
+    probe.once('error', () => reject(new Error('Scratch port ' + port + ' is unavailable. E2E will not stop an existing process.')));
+    probe.listen(port, '127.0.0.1', () => probe.close(error => error ? reject(error) : resolve()));
+  });
+}
 test.beforeAll(async () => {
-  for (const port of [4317, 5173]) {
-    let inUse = false;
-    try { await fetch('http://127.0.0.1:' + port); inUse = true; } catch { /* Expected free port. */ }
-    if (inUse) throw new Error('Port ' + port + ' is in use. Stop the local demo before E2E testing.');
-  }
+  for (const port of [4319, 5175]) await assertPortAvailable(port);
   api = launch(['--import', 'tsx', 'apps/api/src/server.ts']);
   web = launch(['node_modules/vite/bin/vite.js', '--config', 'apps/web/vite.config.ts', 'apps/web']);
-  await waitForURL('http://127.0.0.1:4317/api/health');
-  await waitForURL('http://127.0.0.1:5173');
+  await waitForURL('http://127.0.0.1:4319/api/health');
+  await waitForURL('http://127.0.0.1:5175');
 });
 test.afterAll(async () => {
   await stop(web);
@@ -72,9 +80,9 @@ test('select, propose, approve, reject and retain revision after API process res
   await expect(page.locator('.rev-pill')).toContainText('Revision 2');
   const previousPID = api.pid;
   await stop(api);
-  await expect.poll(async () => { try { await fetch('http://127.0.0.1:4317/api/health'); return true; } catch { return false; } }).toBe(false);
+  await expect.poll(async () => { try { await fetch('http://127.0.0.1:4319/api/health'); return true; } catch { return false; } }).toBe(false);
   api = launch(['--import', 'tsx', 'apps/api/src/server.ts']);
-  await waitForURL('http://127.0.0.1:4317/api/health');
+  await waitForURL('http://127.0.0.1:4319/api/health');
   expect(api.pid).not.toBe(previousPID);
   await page.reload();
   await expect(page.locator('.rev-pill')).toContainText('Revision 2');

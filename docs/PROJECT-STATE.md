@@ -1,57 +1,63 @@
 # Sovrad project state
 
-Observed on 2026-11-01, on Windows with Node 24.20.0 and npm 11.19.0.
+Foundation status reviewed 2026-11-02 (package 0.1.0).
+This record distinguishes source capability from executed verification.
 
-## Verified locally
+## Current product scope
 
-- Supplied starter ZIP and Stage 0 handoff inspected; their claims were not used
-  as proof of a working application.
-- Source moved into the owner's Renvarel Products/Sovrad folder with SHA-256
-  verification; the previous source folder was left empty.
-- Dependencies installed and package-lock.json generated; clean npm ci passed.
-- npm test: 22 passed, zero failed/skipped (7 core, 13 API/storage/path, 2 scanner).
-- npm run check: API/web typechecks and Vite production build passed.
-- npm run test:e2e: 3 passed in installed Chrome on Windows. The suite checks
-  selectable nodes, proposals, approval/rejection, a stopped API followed by
-  a different API PID, persisted rules, narrow layout and consent reset.
-- Six deliberate guard regressions each caused exactly one expected failing
-  test. Original source bytes were restored; the complete suite passed again.
-- Public-file scanner passed against working and staged content. Runtime data,
-  generated screenshots, logs, test results and dependencies are excluded.
-- npm audit completed successfully: zero known vulnerabilities at verification
-  time. Earlier advisory-service connection resets were resolved.
+The shipped interface is the synthetic calculator workflow, proposal review and
+local AI budget panel. Manual approval updates a specification revision, not
+implementation code. Multi-project dashboards, annotations and an owner decision
+center are not implemented.
 
-## Public preview
+The backend includes revision-safe history, durable daily attempts and $5 local
+lifetime spending accounting, supported-schema backup/migration, synthetic task
+manifests, task approval/cancel/events and blocked start. Import status/list/get
+and blocked submission routes exist; capture helpers are exercised internally
+with synthetic repositories. Native coding and real private-project import
+remain disabled.
 
-The owner approved creation and publication of
-https://github.com/Renvarel-Solutions/sovrad as a public Apache-2.0 preview.
-The dedicated repository was created; private vulnerability reporting, secret
-scanning and secret-scanning push protection were enabled before the first push.
-Auto-merge is disabled. Main-branch review/CI protections are part of the
-publication gate and are verified separately through repository settings.
+## Verification record
 
-Hosted Windows/Linux CI results are available in the repository's Actions tab.
-Local passes above never substitute for hosted results. This dated record
-documents the initial local baseline, not future commits' verification state.
+- The full local suite passed 68 tests (7 core, 50 API, 8 runner and 3 scanner),
+  with zero failures or skips.
+- `npm run check` passed API/runner/web typechecks and the Vite production build.
+- `npm run public-check` passed against 66 source files before this doc update;
+  repeat publication review against the final file set before pushing.
+- Source-security review cleared the controlled provider-transport and
+  private-content-filter fixes after 13 focused security tests passed.
+- Four deliberate decoder regressions produced failures; exact source bytes were
+  restored and all four decoder checks passed again.
+- Fourteen focused migration/recovery checks passed, covering supported-version
+  preservation, backup ordering, newer-schema rejection, failed initialization
+  cleanup and retained crash/unknown reservations.
+- Ten focused text-fidelity checks passed after four specific BOM/multibyte
+  failures were observed before the fix, covering committed UTF-8 snapshot
+  fidelity and protocol decoding across byte boundaries.
+- A diagnostic-only installed Codex `0.166.0-alpha.5.1` initialization succeeded
+  with an empty configuration and `codingEnabled: false`. This did not establish
+  sign-in, model access or native isolation.
+- In the prior browser run, all three original calculator journeys passed in
+  16 seconds on scratch ports 5175/4319, including a real API-process restart
+  with persisted revisions,
+  the 390 px layout and consent reset. No page errors were observed.
+- An occupied scratch API port caused the expected refusal with exit code 1;
+  the test harness did not stop the existing listener.
+- Clean exact-HEAD verification remains pending; the earlier browser receipt
+  does not establish verification of the final source revision.
+- Existing main CI was green at `c3e6bd9`. The new foundation has not yet been
+  committed, pushed or verified by hosted CI; that earlier result does not cover it.
+- No live OpenAI call was made and no dedicated key was loaded for this work.
 
-## Implementation results
+## Remaining gates
 
-- Correct React Flow import and Sovrad product branding.
-- Explicit/default data paths validated, including existing junctions.
-- Approval, snapshots, current workflow and audit share one SQLite transaction.
-- Durable AI quota counts ten attempts per UTC day, including provider failures.
-- AI requires explicit consent and sends minimal selected data. It validates
-  structured output, rechecks revision and applies output/time limits with no retries.
-- AI tests use a fake provider transport. No live OpenAI request was made.
+Live drafting requires a dedicated backend key, confirmed enforced provider
+project hard limit and explicit consent for each request. Local cost accounting
+is conservative and does not establish exact billing. Credential/PII filtering
+is heuristic. SQLite remains local plaintext under OS-account trust.
 
-## Remaining product gates
-
-- Live AI needs a dedicated restricted key, chosen model and provider billing
-  controls. Never send a key through an issue or chat.
-- Codex runner is not implemented or enabled. Review RUNNER-PLAN.md separately.
-  Workflow approval does not authorize code execution, commit, merge or deployment.
-- External project import and the first private read-only isolated pilot are not
-  implemented. No other repository or production environment was changed.
-
-The preview is verified for the synthetic calculator scope. These results do
-not certify production readiness, live AI access or runner isolation.
+Coding requires adversarial native-isolation proof and a successful bounded
+synthetic run; a worktree or diagnostic handshake cannot supply that proof.
+Actual private imports require their own read-only pilot gate. Source review,
+coding, merge and deployment permissions remain separate. See
+[RUNNER-PLAN.md](RUNNER-PLAN.md) and [SECURITY.md](../SECURITY.md).
