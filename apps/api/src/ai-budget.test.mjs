@@ -1,16 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, rmSync} from 'node:fs';
+import {existsSync, mkdtempSync, realpathSync, rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import {Storage} from './storage.ts';
 
-function fixture(t) {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'sovrad-budget-'));
+function fixture(t, transformDirectory = directory => directory) {
+  const createdDirectory = mkdtempSync(path.join(os.tmpdir(), 'sovrad-budget-'));
+  const directory = transformDirectory(createdDirectory);
   const storage = new Storage(directory);
-  t.after(() => { try { storage.close(); } catch {} rmSync(directory, {recursive: true, force: true}); });
+  t.after(() => { try { storage.close(); } catch {} rmSync(createdDirectory, {recursive: true, force: true}); });
   return {storage, directory};
+}
+
+function isStrictFilesystemDescendant(directory, candidate) {
+  const relative = path.relative(realpathSync.native(directory), realpathSync.native(candidate));
+  return relative !== '' && relative !== '..'
+    && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 }
 
 test('budget atomically reserves worst-case cost and survives restart', t => {
@@ -64,11 +71,31 @@ test('online SQLite backup restores original workflow and budget without resetti
   const id = storage.budget.reserve(100);
   storage.budget.settle(id, {input_tokens: 100, output_tokens: 10});
   const backup = await storage.backup();
-  assert.ok(path.resolve(backup).startsWith(path.resolve(directory) + path.sep));
+  assert.ok(isStrictFilesystemDescendant(directory, backup));
   const restored = new Database(backup, {readonly: true});
   try {
     assert.equal(restored.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
     assert.equal(restored.prepare('SELECT count(*) AS n FROM workflow_revisions').get().n, 1);
     assert.equal(restored.prepare('SELECT actual_micros FROM ai_spending').get().actual_micros, 370);
   } finally { restored.close(); }
+});
+
+test('online SQLite backup stays inside an alternate-case Windows private directory', {
+  skip: process.platform !== 'win32',
+}, async t => {
+  const {storage, directory} = fixture(t, directory =>
+    path.join(path.dirname(directory), path.basename(directory).toUpperCase()));
+  assert.ok(existsSync(directory));
+  const backup = await storage.backup();
+  assert.ok(existsSync(backup));
+  assert.ok(isStrictFilesystemDescendant(directory, backup));
+});
+
+test('backup containment excludes the private directory itself, its parent and a sibling with the same prefix', t => {
+  const {directory} = fixture(t);
+  const sibling = mkdtempSync(directory + '-sibling-');
+  t.after(() => rmSync(sibling, {recursive: true, force: true}));
+  assert.equal(isStrictFilesystemDescendant(directory, directory), false);
+  assert.equal(isStrictFilesystemDescendant(directory, path.dirname(directory)), false);
+  assert.equal(isStrictFilesystemDescendant(directory, sibling), false);
 });
